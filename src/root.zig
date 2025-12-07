@@ -1,5 +1,38 @@
 const std = @import("std");
 
+pub fn day_3() !void {
+    const problem = "day_3";
+    const path = "./inputs/" ++ problem ++ ".txt";
+
+    const size = 10 << 20;
+    var buf: [size]u8 = undefined;
+    const content = try read_file(path, &buf);
+
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+
+    const K: usize = 12;
+
+    var sum: u128 = 0;
+    var it = std.mem.splitScalar(u8, content, '\n');
+    while (it.next()) |line| {
+        const bank = std.mem.trim(u8, line, " \r\t");
+        if (bank.len == 0) continue;
+
+        const best = try maxSubsequenceK(bank, K);
+
+        var value: u64 = 0;
+        for (best) |c| {
+            const d: u8 = c - '0';
+            value = value * 10 + @as(u64, d);
+        }
+
+        sum += value;
+    }
+
+    std.debug.print("result: {d}\n", .{sum});
+}
+
 pub fn day_2() !void {
     const problem = "day_2";
     const path = "./inputs/" ++ problem ++ ".txt";
@@ -28,7 +61,6 @@ pub fn day_2() !void {
                 const id_str = try std.fmt.allocPrint(arena.allocator(), "{d}", .{id});
                 const repeated_seq = is_repeated_sequence(id_str);
                 if (repeated_seq) {
-                    // std.debug.print("Invalid ID: {d}\n", .{id});
                     sum += id;
                 }
             }
@@ -97,11 +129,6 @@ fn is_repeated_sequence(str: []const u8) bool {
         return false;
     };
 
-    // for (lps.items) |elem| {
-    //     std.debug.print("{}, ", .{elem});
-    // }
-    // std.debug.print("\n", .{});
-
     const L = lps.items[lps.items.len - 1];
 
     return n > 1 and L != 0 and @mod(n, n - L) == 0;
@@ -133,4 +160,42 @@ fn build_lps(str: []const u8, lps: *[]usize) !*[]usize {
     }
 
     return lps;
+}
+
+fn maxSubsequenceK(bank: []const u8, comptime K: usize) ![K]u8 {
+    const n = bank.len;
+    if (n < K) {
+        return error.BankTooShort;
+    }
+
+    var result: [K]u8 = undefined;
+
+    var pos: usize = 0;
+    var picked: usize = 0;
+
+    while (picked < K) : (picked += 1) {
+        const remaining = K - picked;
+        const search_end = n - remaining;
+
+        std.debug.assert(pos <= search_end);
+
+        var best_idx: usize = pos;
+        var best_digit: u8 = bank[pos];
+
+        var i: usize = pos + 1;
+        while (i <= search_end) : (i += 1) {
+            const d = bank[i];
+            if (d > best_digit) {
+                best_digit = d;
+                best_idx = i;
+
+                if (best_digit == '9') break;
+            }
+        }
+
+        result[picked] = best_digit;
+        pos = best_idx + 1;
+    }
+
+    return result;
 }
